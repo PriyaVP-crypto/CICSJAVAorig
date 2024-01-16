@@ -1,0 +1,87 @@
+pipeline {
+         agent  { 
+                label 'Mainframe2.4'
+				}
+         environment {
+        z_cred = credentials('MainframeID2.4')
+        nexus_pass = credentials('NexusPass')
+        ALIAS_SOURCING = """
+                  . /u/ibmuser/temp1/mvnprofile
+                  """
+        //PATH="C://Users//Administrator//AppData//Roaming//npm//node_modules//newman//bin//newman:$PATH"
+         }
+
+stages {
+				     
+	stage('Clean Workspace') {
+         	steps {
+                      echo 'clean the workspace'
+			cleanWs()
+                  	}
+		}
+				
+	stage('Git checout scm') {
+                 steps {
+				     //sh 'git config --global http.sslVerify false'
+                       echo 'Cloning from the gitlab'
+                       checkout([$class: 'GitSCM', branches: [[name: '*/master']], 
+                       doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], 
+                       userRemoteConfigs: [[url: 'https://github.com/PriyaVP-crypto/CICSJAVAorig.git']]])
+                       echo 'Clone success'
+                 	}
+		}
+				 
+	
+	 
+	stage('Java build and artifact') {
+                 steps {
+				      echo 'Generating artifact in Progress'
+				      sh '''${ALIAS_SOURCING}
+                      cd ${WORKSPACE}/WEB-INF
+                      mvn -Dmaven.repo.local=/u/ibmuser/temp1/.m2/repository -DskipTests clean install'''
+				      //sh "mvn -Dmaven.repo.local=/u/ibmuser/temp1/.m2/repository -DskipTests clean install"
+				      //sh "mvn -Dmaven.repo.local=/u/ibmuser/temp1/.m2/repository -DskipTests clean install"
+					  //sh "/usr/lpp/IBM/dbb/bin/groovyz /u/wml/jenkinsPipeline/WMLzAppBuild/build.groovy --logEncoding UTF-8 --fullBuild  --application samples --sourceDir /u/wml/jenkinsPipeline/WMLzAppBuild --workDir /u/wml/jenkinsPipeline/WMLzAppBuild/BUILD-134 --hlq DBB.ZEN --buildHash"
+				      //sh '''/usr/lpp/IBM/dbb/bin/groovyz ${WORKSPACE}/COBcallJava/languages/packageArtifact.groovy DBB.ZEN COBJAVA ${WORKSPACE}
+				      //cd ${WORKSPACE}
+				      //tar -cvf myProject.tar DBB.ZEN.LOAD '''
+                 }
+				 }
+				 
+	stage('Publishing to Nexus') {
+                 steps {
+				      echo 'Publishing to Nexus Repository '
+				      sh '''${ALIAS_SOURCING}
+                      cd ${WORKSPACE}/WEB-INF'''
+                      script {
+                          sh '''${ALIAS_SOURCING}
+                         cd ${WORKSPACE}/WEB-INF'''
+                          def mavenPom = readMavenPom file: 'pom.xml'
+                          nexusArtifactUploader artifacts: [
+				          [
+				          artifactId: 'CICSJava',
+				          classifier: '',
+				          file: "WEB-INF/target/CICSJava-${mavenPom.version}.war",
+				          type: 'war'
+				          ]
+				          ],
+				          
+				          credentialsId: 'nexas3',
+				          groupId: 'com.tcs.CICSJava',
+				          nexusUrl: '169.38.75.202:8098',
+				          nexusVersion: 'nexus3',
+				          protocol: 'http',
+				          repository: 'CICSJAVA',
+				          version: "${mavenPom.version}"
+                      }
+				      
+				 	// sh "curl -v --user 'admin:ibmuser@7' --upload-file ${WORKSPACE} http://169.38.75.202:8098/repository/CICSJAVA/"
+				 	// sh '''${ALIAS_SOURCING}
+				 	// cd ${WORKSPACE}/
+                //mvn deploy -Dmaven.repo.local=/u/ibmuser/temp1/.m2/repository -DskipTests -DNEXUS_REPO=http://169.38.75.202:8098/repository/CICSJAVA/'''
+                 }
+				 }
+				 
+
+           }
+		   }
